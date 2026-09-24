@@ -1,0 +1,4 @@
+# Copy the values into ~/.gradle/gradle.properties or pass them with -P.
+# Never commit real URLs or credentials to the repository.
+bildreise.modelBundleUrl=https://your-https-host.example/models/bildreise-image-generator.zip
+bildreise.modelBundleSha256=replace-with-the-64-character-sha256

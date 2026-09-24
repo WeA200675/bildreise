@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "name": "bildreise-on-device-image-to-image",
+  "input": {"width": 512, "height": 512, "channels": 3, "format": "float32_rgb"},
+  "output": {"width": 512, "height": 512, "channels": 3, "format": "uint8_rgb"},
+  "controls": ["seed", "strength", "recognition", "profile"],
+  "backends": ["gpu", "npu", "cpu"],
+  "network_required": false
+}

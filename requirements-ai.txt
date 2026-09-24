@@ -1,0 +1,7 @@
+# Install in a GPU environment only. Keep model weights out of the repository.
+torch
+diffusers>=0.40.0
+transformers
+accelerate
+safetensors
+Pillow
