@@ -3,13 +3,18 @@ from __future__ import annotations
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from socket import timeout as SocketTimeout
 
 from dream_provider import DreamRequest, create_provider
 
 
 class Handler(BaseHTTPRequestHandler):
     provider = create_provider()
+    MAX_BODY = 20_000_000
+
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(15)
 
     def send_json(self, status: int, body: dict):
         encoded = json.dumps(body).encode()
@@ -40,16 +45,36 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"error": "not_found"})
             return
         try:
-            length = int(self.headers.get("Content-Length", "0"))
-            if length > 20_000_000:
-                raise ValueError("image payload too large")
-            body = json.loads(self.rfile.read(length).decode())
+            lengths = self.headers.get_all("Content-Length", [])
+            if len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdigit() or self.headers.get("Transfer-Encoding"):
+                raise ValueError("invalid content length")
+            length = int(lengths[0])
+            if length > self.MAX_BODY:
+                self.send_json(413, {"error": "payload_too_large"})
+                return
+            if length == 0:
+                raise ValueError("empty body")
+            raw = self.rfile.read(length)
+            if len(raw) != length:
+                raise ValueError("incomplete body")
+            body = json.loads(raw.decode())
+            if not isinstance(body, dict) or not isinstance(body.get("image_base64"), str):
+                raise ValueError("invalid image request")
             request = DreamRequest(**body).normalized()
             if not request.image_base64:
                 raise ValueError("image_base64 is required")
-            self.send_json(200, self.provider.generate(request))
-        except Exception as exc:
-            self.send_json(400, {"error": str(exc)})
+        except SocketTimeout:
+            self.send_json(408, {"error": "request_timeout"})
+            return
+        except (ValueError, TypeError, OverflowError):
+            self.send_json(400, {"error": "invalid_request"})
+            return
+        try:
+            result = self.provider.generate(request)
+        except Exception:
+            self.send_json(503, {"error": "provider_unavailable"})
+            return
+        self.send_json(200, result)
 
 
 if __name__ == "__main__":
